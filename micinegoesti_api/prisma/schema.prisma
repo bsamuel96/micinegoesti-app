@@ -1,0 +1,598 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String               @id @default(cuid())
+  phone           String               @unique
+  email           String?
+  name            String?
+  role            String               @default("customer")
+  passwordHash    String?              @map("password_hash")
+  isActive        Boolean              @default(true)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  orders          Order[]              @relation("CustomerOrders")
+  assignedOrders  Order[]              @relation("DelivererOrders")
+  statusChanges   OrderStatusHistory[]
+  createdVoucherRules VoucherRule[]    @relation("VoucherRuleCreatedBy")
+  updatedVoucherRules VoucherRule[]    @relation("VoucherRuleUpdatedBy")
+  vouchers        Voucher[]            @relation("VoucherRecipient")
+  createdVouchers Voucher[]            @relation("VoucherCreatedBy")
+  approvedVouchers Voucher[]           @relation("VoucherApprovedBy")
+  revokedVouchers Voucher[]            @relation("VoucherRevokedBy")
+  voucherRedemptions VoucherRedemption[]
+  carts           Cart[]
+  sessions        Session[]
+  favorites       Favorite[]
+  auditLogs       AuditLog[]
+  shiftProfile    UserShiftProfile?
+  handoverItemsCreated ShiftHandoverItem[] @relation("HandoverCreatedBy")
+  handoverItemsAcknowledged ShiftHandoverItem[] @relation("HandoverAcknowledgedBy")
+  handoverItemsResolved ShiftHandoverItem[] @relation("HandoverResolvedBy")
+  handoverAttachments ShiftHandoverAttachment[] @relation("HandoverAttachmentUploadedBy")
+  handoverComments ShiftHandoverComment[] @relation("HandoverCommentCreatedBy")
+  assignedShiftSchedules ShiftSchedule[] @relation("ShiftScheduleAssignedUser")
+  managedShiftSchedules ShiftSchedule[] @relation("ShiftScheduleManager")
+  createdShiftSchedules ShiftSchedule[] @relation("ShiftScheduleCreatedBy")
+  shiftWhatsAppSubscribers ShiftWhatsAppSubscriber[]
+  shiftAuditLogs ShiftAuditLog[] @relation("ShiftAuditActor")
+
+  @@map("users")
+}
+
+model OtpChallenge {
+  id           String    @id @default(cuid())
+  phone        String
+  codeHash     String
+  requesterIp  String?
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  attempts     Int       @default(0)
+  createdAt    DateTime  @default(now())
+
+  @@index([phone, createdAt])
+  @@map("otp_challenges")
+}
+
+model Session {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("sessions")
+}
+
+model Category {
+  id         String            @id @default(cuid())
+  slug       String            @unique
+  label      String
+  sortOrder  Int               @default(0)
+  isActive   Boolean           @default(true)
+  products   ProductCategory[]
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@map("categories")
+}
+
+model Product {
+  id                String            @id @default(cuid())
+  externalId        Int?              @unique
+  slug              String            @unique
+  name              String
+  description       String?
+  shortDescription  String?
+  price             Decimal           @default(0)
+  imageUrl          String?
+  legacyImageUrl    String?
+  isPublished       Boolean           @default(true)
+  isAvailable       Boolean           @default(true)
+  sortOrder         Int               @default(0)
+  attributesJson    String?
+  categories        ProductCategory[]
+  images            ProductImage[]
+  orderItems        OrderItem[]
+  cartItems         CartItem[]
+  favorites         Favorite[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@map("products")
+}
+
+model ProductImage {
+  id             String   @id @default(cuid())
+  productId      String
+  url            String
+  storagePath    String?  @unique
+  thumbnailUrl   String?
+  legacyImageUrl String?
+  alt            String?
+  sortOrder      Int      @default(0)
+  width          Int?
+  height         Int?
+  fileSize       Int?
+  mimeType       String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+  @@map("product_images")
+}
+
+model ProductCategory {
+  productId   String
+  categoryId  String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+  @@map("product_categories")
+}
+
+model Cart {
+  id         String     @id @default(cuid())
+  sessionId  String?    @unique
+  userId     String?
+  user       User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items      CartItem[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@map("carts")
+}
+
+model CartItem {
+  id         String   @id @default(cuid())
+  cartId     String
+  productId  String
+  quantity   Int      @default(1)
+  unitPrice  Decimal  @default(0)
+  cart       Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id])
+
+  @@unique([cartId, productId])
+  @@map("cart_items")
+}
+
+model Order {
+  id                   Int                  @id @default(autoincrement())
+  orderKeyHash         String?              @unique
+  userId               String?
+  assignedDelivererId  String?
+  contactName          String
+  phone                String
+  address              String?
+  orderType            String
+  mapPinLat            Float?
+  mapPinLng            Float?
+  status               String               @default("pending")
+  subtotal             Decimal              @default(0)
+  deliveryCost         Decimal              @default(0)
+  total                Decimal              @default(0)
+  voucherId            String?
+  voucherCode          String?
+  discountAmount       Decimal              @default(0)
+  paymentStatus        String               @default("unpaid")
+  paidAt               DateTime?
+  notes                String?
+  whatsappMessage      String?
+  user                 User?                @relation("CustomerOrders", fields: [userId], references: [id], onDelete: SetNull)
+  assignedDeliverer    User?                @relation("DelivererOrders", fields: [assignedDelivererId], references: [id], onDelete: SetNull)
+  voucher              Voucher?             @relation(fields: [voucherId], references: [id], onDelete: SetNull)
+  voucherRedemption    VoucherRedemption?
+  items                OrderItem[]
+  statusHistory        OrderStatusHistory[]
+  payments             Payment[]
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  @@index([phone])
+  @@index([status])
+  @@index([orderType])
+  @@index([voucherId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String   @id @default(cuid())
+  orderId     Int
+  productId   String?
+  name        String
+  quantity    Int
+  unitPrice   Decimal  @default(0)
+  totalPrice  Decimal  @default(0)
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id               String    @id @default(cuid())
+  orderId          Int
+  fromStatus       String?
+  toStatus         String
+  changedByUserId  String?
+  note             String?
+  createdAt        DateTime  @default(now())
+  order            Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedBy        User?     @relation(fields: [changedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt])
+  @@map("order_status_history")
+}
+
+model Payment {
+  id             String    @id @default(cuid())
+  orderId        Int
+  amount         Decimal   @default(0)
+  method         String    @default("cash")
+  status         String    @default("unpaid")
+  markedByUserId String?
+  paidAt         DateTime?
+  refundedAt     DateTime?
+  note           String?
+  createdAt      DateTime  @default(now())
+  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("payments")
+}
+
+model Setting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  isSecret    Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@map("settings")
+}
+
+model DeliveryZone {
+  id          String   @id
+  name        String
+  price       Decimal  @default(0)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("delivery_zones")
+}
+
+model LastOrder {
+  id        String   @id @default(cuid())
+  sessionId String   @unique
+  userId    String?
+  itemsJson String   @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("last_orders")
+}
+
+model GameScore {
+  id        String   @id @default(cuid())
+  sessionId String?  @unique
+  userId    String?  @unique
+  playerName String?
+  bestScore Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  vouchers  Voucher[]
+
+  @@index([bestScore])
+  @@map("game_scores")
+}
+
+model VoucherRule {
+  id              String    @id @default(cuid())
+  name            String
+  triggerType     String
+  discountType    String
+  discountValue   Decimal
+  maximumDiscount Decimal?
+  minimumSubtotal Decimal   @default(0)
+  validityDays    Int?
+  codePrefix      String    @default("MICI")
+  requiresApproval Boolean  @default(true)
+  isActive        Boolean   @default(false)
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdBy       User?     @relation("VoucherRuleCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedBy       User?     @relation("VoucherRuleUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  vouchers        Voucher[]
+
+  @@index([triggerType, isActive])
+  @@map("voucher_rules")
+}
+
+model Voucher {
+  id                  String               @id @default(cuid())
+  ruleId              String?
+  code                String               @unique
+  name                String
+  description         String?
+  status              String               @default("pending")
+  sourceType          String
+  userId              String?
+  sessionKey          String?
+  gameScoreId         String?
+  sourceScore         Int?
+  previousRecordScore Int?
+  discountType        String
+  discountValue       Decimal
+  maximumDiscount     Decimal?
+  minimumSubtotal     Decimal              @default(0)
+  validFrom           DateTime             @default(now())
+  expiresAt           DateTime?
+  maxRedemptions      Int                  @default(1)
+  redemptionCount     Int                  @default(0)
+  createdByUserId     String?
+  approvedByUserId    String?
+  approvedAt          DateTime?
+  revokedByUserId     String?
+  revokedAt           DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  rule                VoucherRule?         @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  user                User?                @relation("VoucherRecipient", fields: [userId], references: [id], onDelete: SetNull)
+  gameScore           GameScore?           @relation(fields: [gameScoreId], references: [id], onDelete: SetNull)
+  createdBy           User?                @relation("VoucherCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  approvedBy          User?                @relation("VoucherApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  revokedBy           User?                @relation("VoucherRevokedBy", fields: [revokedByUserId], references: [id], onDelete: SetNull)
+  orders              Order[]
+  redemptions         VoucherRedemption[]
+
+  @@index([status])
+  @@index([sourceType])
+  @@index([userId])
+  @@index([sessionKey])
+  @@unique([ruleId, gameScoreId, sourceScore])
+  @@map("vouchers")
+}
+
+model VoucherRedemption {
+  id             String   @id @default(cuid())
+  voucherId      String?
+  orderId        Int      @unique
+  userId         String?
+  voucherCode    String
+  subtotal       Decimal
+  discountAmount Decimal
+  deliveryCost   Decimal
+  finalTotal     Decimal
+  redeemedAt     DateTime @default(now())
+  voucher        Voucher? @relation(fields: [voucherId], references: [id], onDelete: SetNull)
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([voucherId, redeemedAt])
+  @@map("voucher_redemptions")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@map("audit_logs")
+}
+
+model Favorite {
+  userId     String
+  productId  String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([userId, productId])
+  @@map("favorites")
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  rating    Int?
+  message   String
+  status    String   @default("new")
+  createdAt DateTime @default(now())
+
+  @@map("feedback")
+}
+
+model ShiftTemplate {
+  id               String   @id @default(cuid())
+  shiftKey         String   @unique @map("shift_key")
+  label            String
+  defaultStartTime String?  @map("default_start_time")
+  defaultEndTime   String?  @map("default_end_time")
+  color            String?
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("shift_templates")
+}
+
+model UserShiftProfile {
+  id                   String   @id @default(cuid())
+  userId               String   @unique @map("user_id")
+  shiftKey             String?  @map("shift_key")
+  displayName          String?  @map("display_name")
+  whatsappNumber       String?  @map("whatsapp_number")
+  notificationsEnabled Boolean  @default(false) @map("notifications_enabled")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_shift_profiles")
+}
+
+model ShiftHandoverItem {
+  id                   String                     @id @default(cuid())
+  code                 String                     @unique
+  createdByUserId      String?                    @map("created_by_user_id")
+  sourceShiftKey       String                     @map("source_shift_key")
+  targetShiftKey       String?                    @map("target_shift_key")
+  category             String
+  priority             String                     @default("normal")
+  locationLabel        String?                    @map("location_label")
+  title                String
+  description          String?
+  status               String                     @default("new")
+  acknowledgedByUserId String?                    @map("acknowledged_by_user_id")
+  acknowledgedAt       DateTime?                  @map("acknowledged_at")
+  resolvedByUserId     String?                    @map("resolved_by_user_id")
+  resolvedAt           DateTime?                  @map("resolved_at")
+  createdAt            DateTime                   @default(now()) @map("created_at")
+  updatedAt            DateTime                   @updatedAt @map("updated_at")
+  createdBy            User?                      @relation("HandoverCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  acknowledgedBy       User?                      @relation("HandoverAcknowledgedBy", fields: [acknowledgedByUserId], references: [id], onDelete: SetNull)
+  resolvedBy           User?                      @relation("HandoverResolvedBy", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+  attachments          ShiftHandoverAttachment[]
+  comments             ShiftHandoverComment[]
+  notifications        ShiftWhatsAppNotification[]
+
+  @@index([sourceShiftKey, createdAt])
+  @@index([targetShiftKey, createdAt])
+  @@index([priority, status])
+  @@index([status, createdAt])
+  @@map("shift_handover_items")
+}
+
+model ShiftHandoverAttachment {
+  id                 String             @id @default(cuid())
+  handoverItemId     String             @map("handover_item_id")
+  uploadedByUserId   String?            @map("uploaded_by_user_id")
+  originalFilename   String?            @map("original_filename")
+  storedFilename     String             @map("stored_filename")
+  relativePath       String             @map("relative_path")
+  mimeType           String             @map("mime_type")
+  sizeBytes          Int                @map("size_bytes")
+  sha256             String?
+  caption            String?
+  expiresAt          DateTime           @map("expires_at")
+  deletedAt          DateTime?          @map("deleted_at")
+  deleteReason       String?            @map("delete_reason")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  handoverItem       ShiftHandoverItem  @relation(fields: [handoverItemId], references: [id], onDelete: Cascade)
+  uploadedBy         User?              @relation("HandoverAttachmentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([handoverItemId, createdAt])
+  @@index([expiresAt, deletedAt])
+  @@map("shift_handover_attachments")
+}
+
+model ShiftHandoverComment {
+  id               String            @id @default(cuid())
+  handoverItemId   String            @map("handover_item_id")
+  createdByUserId  String?           @map("created_by_user_id")
+  body             String
+  createdAt        DateTime          @default(now()) @map("created_at")
+  handoverItem     ShiftHandoverItem @relation(fields: [handoverItemId], references: [id], onDelete: Cascade)
+  createdBy        User?             @relation("HandoverCommentCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([handoverItemId, createdAt])
+  @@map("shift_handover_comments")
+}
+
+model ShiftSchedule {
+  id              String   @id @default(cuid())
+  scheduleDate    DateTime @map("schedule_date")
+  shiftKey        String   @map("shift_key")
+  assignedUserId  String?  @map("assigned_user_id")
+  managerUserId   String?  @map("manager_user_id")
+  startTime       String?  @map("start_time")
+  endTime         String?  @map("end_time")
+  status          String   @default("planned")
+  notes           String?
+  createdByUserId String?  @map("created_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  assignedUser    User?    @relation("ShiftScheduleAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  managerUser     User?    @relation("ShiftScheduleManager", fields: [managerUserId], references: [id], onDelete: SetNull)
+  createdBy       User?    @relation("ShiftScheduleCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([scheduleDate, shiftKey])
+  @@index([assignedUserId, scheduleDate])
+  @@map("shift_schedules")
+}
+
+model ShiftWhatsAppSubscriber {
+  id             String                      @id @default(cuid())
+  userId         String?                     @map("user_id")
+  displayName    String                      @map("display_name")
+  whatsappNumber String                      @map("whatsapp_number")
+  shiftFilter    String                      @default("all") @map("shift_filter")
+  priorityFilter String                      @default("all") @map("priority_filter")
+  enabled        Boolean                     @default(true)
+  createdAt      DateTime                    @default(now()) @map("created_at")
+  updatedAt      DateTime                    @updatedAt @map("updated_at")
+  user           User?                       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  notifications  ShiftWhatsAppNotification[]
+
+  @@index([enabled, shiftFilter, priorityFilter])
+  @@map("shift_whatsapp_subscribers")
+}
+
+model ShiftWhatsAppNotification {
+  id                String                   @id @default(cuid())
+  handoverItemId    String?                  @map("handover_item_id")
+  subscriberId      String?                  @map("subscriber_id")
+  toNumber          String                   @map("to_number")
+  provider          String
+  status            String
+  messagePreview    String?                  @map("message_preview")
+  providerMessageId String?                  @map("provider_message_id")
+  errorMessage      String?                  @map("error_message")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  sentAt            DateTime?                @map("sent_at")
+  handoverItem      ShiftHandoverItem?       @relation(fields: [handoverItemId], references: [id], onDelete: SetNull)
+  subscriber        ShiftWhatsAppSubscriber? @relation(fields: [subscriberId], references: [id], onDelete: SetNull)
+
+  @@index([handoverItemId, createdAt])
+  @@index([status, createdAt])
+  @@map("shift_whatsapp_notifications")
+}
+
+model ShiftAuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?  @map("actor_user_id")
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  metadata    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  actor       User?    @relation("ShiftAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@index([entityType, entityId])
+  @@map("shift_audit_logs")
+}

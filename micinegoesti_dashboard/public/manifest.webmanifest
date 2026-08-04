@@ -1,0 +1,36 @@
+{
+  "name": "Mici de Negoești · Panou operațional",
+  "short_name": "MDN Admin",
+  "description": "Administrare, bucătărie și livrări Mici de Negoești.",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#7f0d19",
+  "icons": [
+    {
+      "src": "/uploads/2026/02/cropped-LogoWebsite-1-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/uploads/2026/02/cropped-LogoWebsite-1.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/uploads/2026/02/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/uploads/2026/02/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+# Original monorepo: retained locally, never published from this deployment repo.
+/micinegoesti/
+
+# Dependencies and generated builds
+**/node_modules/
+**/dist/
+**/coverage/
+**/*.tsbuildinfo
+**/.vercel/
+
+# Environment files and credentials
+**/.env
+**/.env.*
+!**/.env.example
+
+# Local runtime data
+**/logs/
+**/*.log
+**/*.db
+**/*.db-journal
+**/*.db-shm
+**/*.db-wal
+/micinegoesti_api/uploads/
+
+# Operating-system and editor files
+**/.DS_Store
+**/.idea/
+**/.vscode/
+*~
