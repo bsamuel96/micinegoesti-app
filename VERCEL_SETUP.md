@@ -16,7 +16,7 @@ secrets in this file. Store them in each Vercel project's Environment Variables.
 | Application | Root directory | Status | Production URL |
 | --- | --- | --- | --- |
 | API | `micinegoesti_api` | Deployed; health fix pending | <https://micinegoesti-api-alpha.vercel.app> |
-| Customer interface | `micinegoesti_client` | Pending | Add after deployment |
+| Customer interface | `micinegoesti_client` | Deployed; settings/redeploy pending | <https://client-micinegoesti.vercel.app> |
 | Dashboard | `micinegoesti_dashboard` | Pending | Add after deployment |
 
 ## API
@@ -99,21 +99,20 @@ as a `VITE_*` value. Changing any of these variables requires a new deployment.
 
 ### Required post-deploy updates
 
-1. Add the customer production URL to the overview table in this file.
-2. In the API Vercel project, add the customer origin to both `CLIENT_URL` and
+1. In the API Vercel project, add the customer origin to both `CLIENT_URL` and
    `CORS_ORIGINS`, then redeploy the API.
-3. In Google Cloud Console, authorize the customer referrer in this form:
-   `https://<customer-domain>/*`.
-4. Keep Maps JavaScript API, Geocoding API, and Routes API enabled for the browser
+2. In Google Cloud Console, authorize this customer referrer:
+   `https://client-micinegoesti.vercel.app/*`.
+3. Keep Maps JavaScript API, Geocoding API, and Routes API enabled for the browser
    key used by the customer application.
-5. Verify the homepage, `/track`, `/orders`, API requests, map, route line, and
+4. Verify the homepage, `/track`, `/orders`, API requests, map, route line, and
    customer live courier movement.
 
 ### Single-page application routing
 
 The customer app uses `BrowserRouter`. Direct visits and refreshes on routes such
-as `/track` and `/orders` need a Vercel rewrite to `/index.html`. Add
-`micinegoesti_client/vercel.json` before considering the deployment complete:
+as `/track` and `/orders` use the rewrite committed in
+`micinegoesti_client/vercel.json`:
 
 ```json
 {
@@ -141,7 +140,7 @@ Dashboard environment variables:
 
 ```text
 VITE_API_URL=https://micinegoesti-api-alpha.vercel.app/api
-VITE_STOREFRONT_URL=<customer production origin>
+VITE_STOREFRONT_URL=https://client-micinegoesti.vercel.app
 VITE_GOOGLE_MAPS_API_KEY=<browser-restricted Google Maps key>
 VITE_GOOGLE_MAPS_MAP_ID=<Google Maps map ID>
 ```
@@ -150,8 +149,8 @@ After dashboard deployment, add its origin to the API `CLIENT_URL` and
 `CORS_ORIGINS`, add it to the Google Maps key's authorized referrers, update
 `VITE_DASHBOARD_URL` in the customer project, and redeploy the affected projects.
 
-The dashboard also uses `BrowserRouter` and needs the same `/index.html` SPA
-rewrite in `micinegoesti_dashboard/vercel.json`.
+The dashboard also uses `BrowserRouter`; its `/index.html` SPA rewrite is
+committed in `micinegoesti_dashboard/vercel.json`.
 
 ## Git deployment workflow
 
@@ -159,8 +158,8 @@ Each Vercel project is connected to the same GitHub repository and watches only
 its configured root directory. Publish setup changes from the repository root:
 
 ```bash
-git add VERCEL_SETUP.md micinegoesti_api/src/app.ts
-git commit -m "Document deployment and fix API runtime"
+git add VERCEL_SETUP.md micinegoesti_client/vercel.json micinegoesti_dashboard/vercel.json
+git commit -m "Record customer deployment and configure Vite routing"
 git push origin main
 ```
 
