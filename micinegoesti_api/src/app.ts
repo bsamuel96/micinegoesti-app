@@ -1,5 +1,6 @@
 import cors from "cors";
 import express from "express";
+import type { RequestHandler } from "express";
 import * as helmetModule from "helmet";
 import morgan from "morgan";
 import { config } from "./config.js";
@@ -23,6 +24,9 @@ import { errorHandler, notFound } from "./lib/http.js";
 import { logInfo } from "./lib/logger.js";
 
 type CorsOriginCallback = (err: Error | null, origin?: boolean | string | RegExp | Array<boolean | string | RegExp>) => void;
+type HelmetFactory = () => RequestHandler;
+
+const createHelmetMiddleware = helmetModule.default as unknown as HelmetFactory;
 
 function normalizeOrigin(origin: string) {
   const trimmed = origin.trim();
@@ -68,7 +72,7 @@ export function createApp() {
   const app = express();
 
   app.set("trust proxy", 1);
-  app.use(helmetModule.default());
+  app.use(createHelmetMiddleware());
   app.use(
     cors({
       origin: corsOrigin,
