@@ -14,7 +14,7 @@
 !**/.env.example
 
 # Local runtime data
-**/logs/
+/micinegoesti_api/logs/
 **/*.log
 **/*.db
 **/*.db-journal
