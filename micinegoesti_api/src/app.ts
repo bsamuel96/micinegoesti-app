@@ -26,7 +26,19 @@ import { logInfo } from "./lib/logger.js";
 type CorsOriginCallback = (err: Error | null, origin?: boolean | string | RegExp | Array<boolean | string | RegExp>) => void;
 type HelmetFactory = () => RequestHandler;
 
-const createHelmetMiddleware = helmetModule.default as unknown as HelmetFactory;
+function resolveHelmetFactory(moduleValue: unknown): HelmetFactory {
+  let candidate = moduleValue;
+
+  for (let depth = 0; depth < 3; depth += 1) {
+    if (typeof candidate === "function") return candidate as HelmetFactory;
+    if (!candidate || typeof candidate !== "object" || !("default" in candidate)) break;
+    candidate = (candidate as { default: unknown }).default;
+  }
+
+  throw new TypeError("Helmet did not expose a callable middleware factory.");
+}
+
+const createHelmetMiddleware = resolveHelmetFactory(helmetModule);
 
 function normalizeOrigin(origin: string) {
   const trimmed = origin.trim();
